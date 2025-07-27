@@ -1,8 +1,8 @@
 import { Effect, Console } from "effect";
 
 
-const fetchRequest = (url: string) => Effect.promise(() => fetch(url));
-const jsonResponse = (response: Response) => Effect.promise(() => response.json());
+const fetchRequest = (url: string) => Effect.tryPromise(() => fetch(url));
+const jsonResponse = (response: Response) => Effect.tryPromise(() => response.json());
 
 
 
