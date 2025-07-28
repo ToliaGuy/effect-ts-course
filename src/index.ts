@@ -1,20 +1,43 @@
-import { Effect, Console } from "effect";
-
-
-const fetchRequest = (url: string) => Effect.tryPromise(() => fetch(url));
-const jsonResponse = (response: Response) => Effect.tryPromise(() => response.json());
+import { Effect, Console, Data  } from "effect";
 
 
 
+class FetchError extends Data.TaggedError("FetchError"){}
+
+class JsonError extends Data.TaggedError("JsonError") {}
 
 
-const main = Effect.flatMap(
-    Effect.flatMap(
-        fetchRequest("https://pokeapi.co/api/v2/pokemon/garchomp/"),
-        jsonResponse
-    ),
-    (json) => Console.log(json)
-)
+const fetchRequest = (url: string) => Effect.tryPromise({
+    try: () => fetch(url),
+    catch: () => new FetchError()
+});
+const jsonResponse = (response: Response) => Effect.tryPromise({
+    try: () => response.json(),
+    catch: () => new JsonError()
+});
 
 
-Effect.runPromise(main)
+
+
+
+const main = fetchRequest("https://pokeapi.co/api/v2/pokemon/garchomp/")
+    .pipe(
+        Effect.filterOrFail(
+            (response) => response.ok,
+            () => new FetchError()
+        ),
+        Effect.flatMap(jsonResponse),
+        Effect.catchTags({
+            FetchError: () => Effect.succeed("Fetch error"),
+            JsonError: () => Effect.succeed("Json error")
+        })
+    )
+
+
+Effect.runPromise(main).then(console.log)
+
+
+
+
+
+
