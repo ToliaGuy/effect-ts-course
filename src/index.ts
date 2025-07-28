@@ -1,4 +1,4 @@
-import { Effect, Console, Data, Schema  } from "effect";
+import { Effect, Console, Data, Schema, Context, ParseResult  } from "effect";
 
 
 class Pokemon extends Schema.Class<Pokemon>("Pokemon")({
@@ -10,35 +10,54 @@ class Pokemon extends Schema.Class<Pokemon>("Pokemon")({
 }) {}
 
 
-const decodePokemon = Schema.decodeUnknown(Pokemon);
-
-
 class FetchError extends Data.TaggedError("FetchError"){}
 
 class JsonError extends Data.TaggedError("JsonError") {}
 
 
-const fetchRequest = (url: string) => Effect.tryPromise({
-    try: () => fetch(url),
-    catch: () => new FetchError()
-});
-const jsonResponse = (response: Response) => Effect.tryPromise({
-    try: () => response.json(),
-    catch: () => new JsonError()
-});
+interface PokeApiImpl {
+    readonly getPokemon: Effect.Effect<
+      Pokemon,
+      FetchError | JsonError | ParseResult.ParseError
+    >;
+  }
+  
+export class PokeApi extends Context.Tag("PokeApi")<PokeApi, PokeApiImpl>() {
+    static readonly Live = PokeApi.of({
+        getPokemon: Effect.gen(function* () {
+        const response = yield* Effect.tryPromise({
+            try: () => fetch("https://pokeapi.co/api/v2/pokemon/garchomp/"),
+            catch: () => new FetchError()
+        });
+
+        if (!response.ok) {
+            return yield* new FetchError();
+        }
+
+        const json = yield* Effect.tryPromise({
+            try: () => response.json(),
+            catch: () => new JsonError(),
+        });
+
+        return yield* Schema.decodeUnknown(Pokemon)(json);
+        }),
+    });
+  }
+
 
 
 const program = Effect.gen(function* () {
-    const response = yield* fetchRequest("https://pokeapi.co/api/v2/pokemon/garchomp/")
-    if (!response.ok) {
-        return yield* new FetchError()
-    }
-    const json = yield* jsonResponse(response)
-    return yield* decodePokemon(json)
-})
+    const pokeApi = yield* PokeApi;
+    return yield* pokeApi.getPokemon;
+  });
+
+const runnable = program.pipe(Effect.provideService(PokeApi, PokeApi.Live));
 
 
-const main = program.pipe(
+
+
+
+const main = runnable.pipe(
     Effect.catchTags({
         FetchError: () => Effect.succeed("Fetch error"),
         JsonError: () => Effect.succeed("Json error"),
