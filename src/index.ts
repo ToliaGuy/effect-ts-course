@@ -1,4 +1,4 @@
-import { Effect, Console, Data  } from "effect";
+import { Effect, Console, Data, gen  } from "effect";
 
 
 
@@ -17,22 +17,21 @@ const jsonResponse = (response: Response) => Effect.tryPromise({
 });
 
 
+const program = Effect.gen(function* () {
+    const response = yield* fetchRequest("https://pokeapi.co/api/v2/pokemon/garchomp/")
+    if (!response.ok) {
+        return yield* new FetchError()
+    }
+    return yield* jsonResponse(response)
+})
 
 
-
-const main = fetchRequest("https://pokeapi.co/api/v2/pokemon/garchomp/")
-    .pipe(
-        Effect.filterOrFail(
-            (response) => response.ok,
-            () => new FetchError()
-        ),
-        Effect.flatMap(jsonResponse),
-        Effect.catchTags({
-            FetchError: () => Effect.succeed("Fetch error"),
-            JsonError: () => Effect.succeed("Json error")
-        })
-    )
-
+const main = program.pipe(
+    Effect.catchTags({
+        FetchError: () => Effect.succeed("Fetch error"),
+        JsonError: () => Effect.succeed("Json error")
+    })
+)
 
 Effect.runPromise(main).then(console.log)
 
