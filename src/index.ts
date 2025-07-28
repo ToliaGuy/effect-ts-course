@@ -1,5 +1,16 @@
-import { Effect, Console, Data, gen  } from "effect";
+import { Effect, Console, Data, Schema  } from "effect";
 
+
+class Pokemon extends Schema.Class<Pokemon>("Pokemon")({
+    id: Schema.Number,
+    order: Schema.Number,
+    name: Schema.String,
+    height: Schema.Number,
+    weight: Schema.Number,
+}) {}
+
+
+const decodePokemon = Schema.decodeUnknown(Pokemon);
 
 
 class FetchError extends Data.TaggedError("FetchError"){}
@@ -22,14 +33,16 @@ const program = Effect.gen(function* () {
     if (!response.ok) {
         return yield* new FetchError()
     }
-    return yield* jsonResponse(response)
+    const json = yield* jsonResponse(response)
+    return yield* decodePokemon(json)
 })
 
 
 const main = program.pipe(
     Effect.catchTags({
         FetchError: () => Effect.succeed("Fetch error"),
-        JsonError: () => Effect.succeed("Json error")
+        JsonError: () => Effect.succeed("Json error"),
+        ParseError: () => Effect.succeed("Parse error")
     })
 )
 
